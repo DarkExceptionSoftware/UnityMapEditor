@@ -6,6 +6,9 @@ namespace UnityEditor.PMA1980.MapEditor
 {
     public class ME_Functions : MonoBehaviour
     {
+        static Texture2D lastTex;
+
+
         public static void OnSceneGUI(SceneView sceneView)
         {
             int controlId = GUIUtility.GetControlID(FocusType.Passive);
@@ -127,12 +130,47 @@ namespace UnityEditor.PMA1980.MapEditor
             go.transform.localPosition = new((x + 0.5f) * x_scale - 0.5f, hit.point.y, (y + 0.5f) * y_scale - 0.5f);
         }
 
-
         public static void Generate_map()
         {
             Transform transform = ME_Globals._ref.transform;
-
             CleanUp(transform);
+
+            if (ME_Globals.texture == null)
+                Fill_map();
+            else
+            {
+                if (lastTex != ME_Globals.texture)
+                {
+                    ME_Globals.pixels = ME_Globals.texture.GetPixels(0);
+                    lastTex = ME_Globals.texture;
+                }
+
+
+
+                float x_scale = 1f / ME_Globals.width;
+                float y_scale = 1f / ME_Globals.height;
+
+                int image_width = ME_Globals.texture.width;
+
+                for (int y = 0; y < ME_Globals.height; y++)
+                {
+                    for (int x = 0; x < ME_Globals.width; x++)
+                    {
+                        if (x < ME_Globals.texture.width && y < ME_Globals.texture.height)
+                            if (ME_Globals.pixels[x + image_width * y].r > 0)
+                                spawn_block(transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
+
+                    }
+                }
+            }
+        }
+
+
+
+        public static void Fill_map()
+        {
+            Transform transform = ME_Globals._ref.transform;
+
             if (ME_Globals._instance != null)
             {
 
@@ -144,22 +182,30 @@ namespace UnityEditor.PMA1980.MapEditor
                     for (int x = 0; x < ME_Globals.width; x++)
                     {
 
-                        var block = Instantiate(ME_Globals._instance);
-
-                        if (block.GetComponent<BoxCollider>() == null)
-                            block.AddComponent<BoxCollider>();
-
-                        block.tag = "Generated";
-                        float min_scale = (x_scale < y_scale) ? x_scale : y_scale;
-                        block.transform.localScale = new(x_scale, min_scale, y_scale);
-
-                        block.transform.parent = transform;
-                        block.transform.localPosition = new((x + 0.5f) * x_scale - 0.5f, 0f, (y + 0.5f) * y_scale - 0.5f);
-
-                        block.name = "B" + min_scale.ToString();
+                        spawn_block(transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
                     }
                 }
             }
+        }
+
+        static void spawn_block(Transform transform, Vector2 position, Vector2 scale)
+        {
+            float x = position.x; float y = position.y;
+            float x_scale = scale.x; float y_scale = scale.y;
+
+            var block = Instantiate(ME_Globals._instance);
+
+            if (block.GetComponent<BoxCollider>() == null)
+                block.AddComponent<BoxCollider>();
+
+            block.tag = "Generated";
+            float min_scale = (x_scale < y_scale) ? x_scale : y_scale;
+            block.transform.localScale = new(x_scale, min_scale, y_scale);
+
+            block.transform.parent = transform;
+            block.transform.localPosition = new((x + 0.5f) * x_scale - 0.5f, 0f, (y + 0.5f) * y_scale - 0.5f);
+
+            block.name = "B" + min_scale.ToString();
         }
 
         static void CleanUp(Transform transform)

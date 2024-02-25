@@ -27,10 +27,14 @@ namespace UnityEditor.PMA1980.MapEditor
 
     public class ME_Editor : EditorWindow
     {
-   
+
         public GameObject _ref, _instance;
         public int width = 1, height = 1;
         public MG_MODE modifier_mode = MG_MODE.NOTHING;
+        bool showRef, showTexture = true, showModifier = true, showHelp = true, showScale = true;
+        GameObject lastRef;
+
+        Vector2 scrollPosition;
 
         // Entry to Unitys topmenu
 
@@ -46,76 +50,166 @@ namespace UnityEditor.PMA1980.MapEditor
         public void OnGUI()
         {
 
+            scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false);
 
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("ref");
+            showRef = EditorGUILayout.Foldout(showRef, "Ref & Instance");
+            GuiLine(1);
 
-
-            ME_Globals._ref = (GameObject)EditorGUILayout.ObjectField(ME_Globals._ref, typeof(GameObject), true);
-
-
-
-            GUILayout.EndHorizontal();
-            // Start a code block to check for GUI changes
-
-            if (ME_Globals._ref != null)
+            if (showRef)
             {
 
-
-                EditorGUI.BeginChangeCheck();
-
                 GUILayout.BeginHorizontal();
+                GUILayout.Label("ref");
+                ME_Globals._ref = (GameObject)EditorGUILayout.ObjectField(ME_Globals._ref, typeof(GameObject), true);
+                GUILayout.EndHorizontal();
+
+                if (ME_Globals._ref != null)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label("Instance");
+                    ME_Globals._instance = (GameObject)EditorGUILayout.ObjectField(ME_Globals._instance, typeof(GameObject), true);
+                    GUILayout.EndHorizontal();
+                }
+                GuiLine();
+
+            }
+
+            // Start a code block to check for GUI changes
+            if (ME_Globals._ref != null)
+            {
+                _refadded();
+
+                if (ME_Globals._ref != lastRef && ME_Globals._ref != null)
+                {
+                    showHelp = false;
+                    lastRef = ME_Globals._ref;
+                }
+            }
+
+            showHelp = EditorGUILayout.Foldout(showHelp, "Help");
+            GuiLine(1);
+
+            if (showHelp)
+            {
+                _noref();
+                GuiLine();
+            }
 
 
+            GUILayout.EndScrollView();
+
+        }
+
+        // Hierachy node referenced
+
+        private void _refadded()
+        {
+
+            EditorGUI.BeginChangeCheck();
+
+            showModifier = EditorGUILayout.Foldout(showModifier, "Modifiers"); GuiLine(1);
+
+            if (showModifier)
+            {
+                GUILayout.BeginHorizontal();
                 ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.ADD, "Add");
                 ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.DELETE, "Del");
                 ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.ROTATE, "Rot");
+                GUILayout.EndHorizontal(); GuiLine();
+
+            }
 
 
+            // MODIVIED PARAMETERS CAUSING REGENERATION
+            EditorGUI.BeginChangeCheck();
+
+            showTexture = EditorGUILayout.Foldout(showTexture, "Level Map"); GuiLine(1);
+
+            if (showTexture)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("LevelMap");
+                ME_Globals.texture = (Texture2D)EditorGUILayout.ObjectField(ME_Globals.texture, typeof(Texture2D), false);
                 GUILayout.EndHorizontal();
 
+                if (ME_Globals.texture != null)
+                {
+                    Texture2D cover = ME_Globals.texture;
+                    float imageWidth = Mathf.Clamp(EditorGUIUtility.currentViewWidth - 40, 10, 128);
+                    float imageHeight = Mathf.Clamp(imageWidth * cover.height / cover.width, 10, 128);
 
+                    Rect rect = GUILayoutUtility.GetRect(imageWidth, imageHeight);
+                    GUI.DrawTexture(rect, cover, ScaleMode.ScaleToFit);
+                }
+                GuiLine();
 
-                // MODIVIED PARAMETERS CAUSING REGENERATION
-                EditorGUI.BeginChangeCheck();
+            }
+
+            showScale = EditorGUILayout.Foldout(showScale, "Scale"); GuiLine(1);
+
+            if (showScale)
+            {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Width");
-                ME_Globals.width = (int)EditorGUILayout.Slider(ME_Globals.width, 1, 10);
+                ME_Globals.width = (int)EditorGUILayout.Slider(ME_Globals.width, 1, 200);
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Height");
-                ME_Globals.height = (int)EditorGUILayout.Slider(ME_Globals.height, 1, 10);
-                GUILayout.EndHorizontal();
+                ME_Globals.height = (int)EditorGUILayout.Slider(ME_Globals.height, 1, 200);
+                GUILayout.EndHorizontal(); GuiLine();
 
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("GameObject");
-                ME_Globals._instance = (GameObject)EditorGUILayout.ObjectField(ME_Globals._instance, typeof(GameObject), true);
-                GUILayout.EndHorizontal();
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    Generate_map();
-                }
             }
-            else
+
+
+
+            if (EditorGUI.EndChangeCheck())
             {
-                GUIStyle style = new GUIStyle(GUI.skin.textArea);
-                style.richText = true;
-                
-                style.wordWrap = true;
-                style.margin = new RectOffset(10,10,10,10);
-                EditorGUILayout.TextArea("Welcome to PMA1980´s Map Editor.\r\n\r\nThere is no <color=red>reference</color> selected. Create a Empty Gameobject in the hierachy and give it the <color=yellow>tag 'MapGenerator'</color>. Afterwards drag it to the Objectfield '_ref'" +
-                    "\r\n\r\nAll generated Objects get a BoxCollider by default to make the Raycast work.\r\n\r\n" +
-                    "All generated Objects get a 'Generated' tag. MapEditor only manipulates Objects with this tag to not mistakenly manipule Objects in scene not affecting MapEditor.", style);
-
+                Generate_map();
             }
+        }
+
+        // Hierachy node not referenced. Show Help.
+
+        private void _noref()
+        {
+            GUIStyle style = new GUIStyle(GUI.skin.textArea);
+            style.richText = true;
+
+            style.wordWrap = true;
+            style.margin = new RectOffset(10, 10, 10, 10);
+            EditorGUILayout.TextArea("Welcome to PMA1980´s Map Editor.\r\n\r\nThere is no <color=red>reference</color> selected. Create a Empty Gameobject in the hierachy and give it the <color=yellow>tag 'MapGenerator'</color>. Afterwards drag it to the Objectfield '_ref'" +
+                "\r\n\r\nAll generated Objects get a BoxCollider by default to make the Raycast work.\r\n\r\n" +
+                "All generated Objects get a 'Generated' tag. MapEditor only manipulates Objects with this tag to not mistakenly manipule Objects in scene not affecting MapEditor.", style);
+
+
         }
 
         // Add a button to the Editor-window and switch the modifier mode (enum).
         // Attach the Raycast-Script if any mode is active
 
-        public MG_MODE add_modifier_button(MG_MODE mod, MG_MODE mod_state, string text)
+        void GuiLine(int i_height = 2)
+
+        {
+
+            Rect rect = EditorGUILayout.GetControlRect(false, i_height);
+
+            rect.height = i_height * 1f;
+
+
+
+            EditorGUI.DrawRect(rect, new Color(0.3f, 0.3f, 0.3f, 1));
+
+            if (i_height == 2)
+            {
+                rect.x -= 6;rect.height = 1;
+                EditorGUI.DrawRect(rect, new Color(0.2f, 0.2f, 0.2f, 1));
+
+            }
+
+        }
+
+        private MG_MODE add_modifier_button(MG_MODE mod, MG_MODE mod_state, string text)
         {
             if (mod == mod_state)
                 GUI.color = new Color32(255, 255, 0, 255);
@@ -135,7 +229,7 @@ namespace UnityEditor.PMA1980.MapEditor
                 }
             }
 
-            GUI.color = new Color32(25, 255, 255, 255);
+            GUI.color = new Color32(255, 255, 255, 255);
             return mod;
         }
     }

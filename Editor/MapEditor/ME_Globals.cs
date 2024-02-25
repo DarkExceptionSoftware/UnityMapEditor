@@ -10,6 +10,8 @@ namespace UnityEditor.PMA1980.MapEditor
         public static GameObject _ref, _instance;
         public static int width = 1, height = 1;
         public static MG_MODE modifier_mode = MG_MODE.NOTHING;
+        public static Texture2D texture = null;
+        public static Color[] pixels = null;
     }
 
     // mouse-Manipulation modes
