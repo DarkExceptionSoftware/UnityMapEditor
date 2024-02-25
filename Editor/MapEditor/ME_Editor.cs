@@ -27,10 +27,14 @@ namespace UnityEditor.PMA1980.MapEditor
 
     public class ME_Editor : EditorWindow
     {
-
+        [SerializeField]
+        public ME_Globals me;
         public GameObject _ref, _instance;
         public int width = 1, height = 1;
         public MG_MODE modifier_mode = MG_MODE.NOTHING;
+        public Texture2D texture = null;
+        public Color[] pixels = null;
+
         bool showRef, showTexture = true, showModifier = true, showHelp = true, showScale = true;
         GameObject lastRef;
 
@@ -49,7 +53,7 @@ namespace UnityEditor.PMA1980.MapEditor
 
         public void OnGUI()
         {
-
+            if (me == null) { me = new ME_Globals(); }
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false);
 
             showRef = EditorGUILayout.Foldout(showRef, "Ref & Instance");
@@ -60,14 +64,14 @@ namespace UnityEditor.PMA1980.MapEditor
 
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("ref");
-                ME_Globals._ref = (GameObject)EditorGUILayout.ObjectField(ME_Globals._ref, typeof(GameObject), true);
+                me._ref = (GameObject)EditorGUILayout.ObjectField(me._ref, typeof(GameObject), true);
                 GUILayout.EndHorizontal();
 
-                if (ME_Globals._ref != null)
+                if (me._ref != null)
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label("Instance");
-                    ME_Globals._instance = (GameObject)EditorGUILayout.ObjectField(ME_Globals._instance, typeof(GameObject), true);
+                    me._instance = (GameObject)EditorGUILayout.ObjectField(me._instance, typeof(GameObject), true);
                     GUILayout.EndHorizontal();
                 }
                 GuiLine();
@@ -75,14 +79,14 @@ namespace UnityEditor.PMA1980.MapEditor
             }
 
             // Start a code block to check for GUI changes
-            if (ME_Globals._ref != null)
+            if (me._ref != null)
             {
                 _refadded();
 
-                if (ME_Globals._ref != lastRef && ME_Globals._ref != null)
+                if (me._ref != lastRef && me._ref != null)
                 {
                     showHelp = false;
-                    lastRef = ME_Globals._ref;
+                    lastRef = me._ref;
                 }
             }
 
@@ -112,9 +116,9 @@ namespace UnityEditor.PMA1980.MapEditor
             if (showModifier)
             {
                 GUILayout.BeginHorizontal();
-                ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.ADD, "Add");
-                ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.DELETE, "Del");
-                ME_Globals.modifier_mode = add_modifier_button(ME_Globals.modifier_mode, MG_MODE.ROTATE, "Rot");
+                me.modifier_mode = add_modifier_button(me.modifier_mode, MG_MODE.ADD, "Add");
+                me.modifier_mode = add_modifier_button(me.modifier_mode, MG_MODE.DELETE, "Del");
+                me.modifier_mode = add_modifier_button(me.modifier_mode, MG_MODE.ROTATE, "Rot");
                 GUILayout.EndHorizontal(); GuiLine();
 
             }
@@ -129,12 +133,12 @@ namespace UnityEditor.PMA1980.MapEditor
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("LevelMap");
-                ME_Globals.texture = (Texture2D)EditorGUILayout.ObjectField(ME_Globals.texture, typeof(Texture2D), false);
+                me.texture = (Texture2D)EditorGUILayout.ObjectField(me.texture, typeof(Texture2D), false);
                 GUILayout.EndHorizontal();
 
-                if (ME_Globals.texture != null)
+                if (me.texture != null)
                 {
-                    Texture2D cover = ME_Globals.texture;
+                    Texture2D cover = me.texture;
                     float imageWidth = Mathf.Clamp(EditorGUIUtility.currentViewWidth - 40, 10, 128);
                     float imageHeight = Mathf.Clamp(imageWidth * cover.height / cover.width, 10, 128);
 
@@ -151,12 +155,12 @@ namespace UnityEditor.PMA1980.MapEditor
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Width");
-                ME_Globals.width = (int)EditorGUILayout.Slider(ME_Globals.width, 1, 200);
+                me.width = (int)EditorGUILayout.Slider(me.width, 1, 200);
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Height");
-                ME_Globals.height = (int)EditorGUILayout.Slider(ME_Globals.height, 1, 200);
+                me.height = (int)EditorGUILayout.Slider(me.height, 1, 200);
                 GUILayout.EndHorizontal(); GuiLine();
 
             }
@@ -165,7 +169,7 @@ namespace UnityEditor.PMA1980.MapEditor
 
             if (EditorGUI.EndChangeCheck())
             {
-                Generate_map();
+                Generate_map(me);
             }
         }
 
@@ -227,10 +231,89 @@ namespace UnityEditor.PMA1980.MapEditor
                     SceneView.duringSceneGui += OnSceneGUI;
                     mod = mod_state;
                 }
-            }
+            }   
 
             GUI.color = new Color32(255, 255, 255, 255);
             return mod;
         }
+
+
+
+        public void OnSceneGUI(SceneView sceneView)
+        {
+            int controlId = GUIUtility.GetControlID(FocusType.Passive);
+            Event current = Event.current;
+
+
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+            {
+                Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                RaycastHit hit;
+
+                if (Physics.Raycast(ray, out hit) && !current.alt)
+                {
+
+                    GameObject cGo = hit.collider.gameObject;
+                    bool consume_mouse_click = false;
+
+                    // Clicked on the map-generator. Spawn go at clicked position
+
+                    if (cGo.tag == "MapGenerator" && hit.normal == Vector3.up)
+                    {
+                        spawn_game_object(hit, me);
+                        consume_mouse_click = true;
+                    }
+                    else
+                    {
+                        // Go up the hierachy and look for 'Generated' Tag in ancestors
+
+                        Transform currentTarget = cGo.transform;
+                        while ((currentTarget != null) && (!currentTarget.CompareTag("Generated")))
+                        {
+                            currentTarget = currentTarget.parent;
+                        }
+
+                        // We clicked on generated GameObject. perform a task
+
+                        if (currentTarget != null)
+                        {
+                            if (me.modifier_mode == MG_MODE.DELETE)
+                            {
+                                DestroyImmediate(currentTarget.gameObject);
+                                consume_mouse_click = true;
+                            }
+
+                            if (me.modifier_mode == MG_MODE.ADD)
+                            {
+                                spawn_game_object(hit, me);
+                                consume_mouse_click = true;
+
+                            }
+
+                            if (me.modifier_mode == MG_MODE.ROTATE)
+                            {
+                                hit.collider.gameObject.transform.Rotate(Vector3.up, 90);
+                                consume_mouse_click = true;
+
+                            }
+                        }
+                        else
+                        {
+                            // Clicked anywhere... Disable the script
+
+                            SceneView.duringSceneGui -= OnSceneGUI;
+
+                        }
+                    }
+                    if (consume_mouse_click)
+                    {
+                        GUIUtility.hotControl = controlId;
+                        Event.current.Use();
+                    }
+                }
+            }
+        }
     }
+
+
 }
