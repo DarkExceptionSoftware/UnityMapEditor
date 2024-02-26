@@ -10,22 +10,20 @@ namespace UnityEditor.PMA1980.MapEditor
     {
 
         public GameObject _ref, _instance;
-        public int width = 1, height = 1;
+        public int width = 1, height = 1,pos_x, pos_y;
         public MG_MODE modifier_mode = MG_MODE.NOTHING;
         public Texture2D texture = null;
-        public Color[] pixels = null;
-
+        public Color[] pixels, tex_pixels;
+        public Dictionary<Color, GameObject> instance_slot;
         public ME_Globals()
         {
-#pragma warning disable CS0168 // Variable ist deklariert, wird jedoch niemals verwendet
-#pragma warning disable CS0219 // Variable ist zugewiesen, der Wert wird jedoch niemals verwendet
-            GameObject _ref, _instance;
-            width = 1; height = 1;
-            MG_MODE modifier_mode = MG_MODE.NOTHING;
-            Texture2D texture = null;
-            Color[] pixels = null;
-#pragma warning restore CS0168 // Variable ist deklariert, wird jedoch niemals verwendet
-#pragma warning restore CS0219 // Variable ist zugewiesen, der Wert wird jedoch niemals verwendet
+            width = 1; height = 1; pos_x = 0; pos_y = 0;
+            modifier_mode = MG_MODE.NOTHING;
+            texture = null;
+            pixels = null;
+
+            tex_pixels = null;
+            instance_slot = new Dictionary<Color, GameObject>();
 
         }
     }

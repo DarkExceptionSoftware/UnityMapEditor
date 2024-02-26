@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing.Printing;
+using System.Linq;
 using UnityEditor;
+using UnityEditor.Rendering;
 using UnityEditorInternal;
 using UnityEngine;
 using static UnityEditor.PMA1980.MapEditor.ME_Functions;
@@ -19,14 +21,16 @@ namespace UnityEditor.PMA1980.MapEditor
             InternalEditorUtility.AddTag("Generated");
             InternalEditorUtility.AddTag("GeneratorBase");
             Debug.Log("PMA1980's MapEditorScript Active.\r\nOpen Topmenu -> Windows -> MapEditor to use.");
-
         }
     }
 
     // Defines the layout of the Editor-Window
 
-    public class ME_Editor : EditorWindow
+    public partial class ME_Editor : EditorWindow
     {
+        public string[] tabs = new string[] { "Control", "TileMap", "Help" };
+        public int tab_sel = 0;
+
         [SerializeField]
         public ME_Globals me;
         public GameObject _ref, _instance;
@@ -34,8 +38,9 @@ namespace UnityEditor.PMA1980.MapEditor
         public MG_MODE modifier_mode = MG_MODE.NOTHING;
         public Texture2D texture = null;
         public Color[] pixels = null;
+        public Texture2D lastTex;
 
-        bool showRef, showTexture = true, showModifier = true, showHelp = true, showScale = true;
+        bool showRef, showColors = false, showTexture = true, showModifier = true, showHelp = true, showScale = true, showOptions = true;
         GameObject lastRef;
 
         Vector2 scrollPosition;
@@ -46,14 +51,36 @@ namespace UnityEditor.PMA1980.MapEditor
         public static void ShowWindow()
         {
             //Show existing window instance. If one doesn't exist, make one.
-            EditorWindow.GetWindow(typeof(ME_Editor), false, "PMA1980 Map Editor");
+            ME_Editor t = (ME_Editor)GetWindow(typeof(ME_Editor), false, "PMA1980 Map Editor");
+            //t.minSize = new(300, 200);
+            //t.maxSize = new(300, 200);
         }
 
         // Defines the layout of the Editor-Window
 
         public void OnGUI()
         {
-            if (me == null) { me = new ME_Globals(); }
+            if (me == null)
+            {
+                me = new ME_Globals();
+            }
+
+            DontDestroyOnLoad(this);
+
+            tab_sel = GUILayout.Toolbar(tab_sel, tabs);
+
+            switch (tab_sel)
+            {
+                case 0: Control_tab(); break;
+                case 1: Tilemap_tab(); break;
+                case 2: Help_tab(); break;
+            }
+        }
+
+        public void Control_tab()
+        {
+
+
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false);
 
             showRef = EditorGUILayout.Foldout(showRef, "Ref & Instance");
@@ -65,16 +92,16 @@ namespace UnityEditor.PMA1980.MapEditor
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("ref");
                 me._ref = (GameObject)EditorGUILayout.ObjectField(me._ref, typeof(GameObject), true);
-                GUILayout.EndHorizontal();
 
                 if (me._ref != null)
-                {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label("Instance");
-                    me._instance = (GameObject)EditorGUILayout.ObjectField(me._instance, typeof(GameObject), true);
-                    GUILayout.EndHorizontal();
-                }
-                GuiLine();
+                    if (me._ref.tag != "MapGenerator")
+                    {
+                        me._ref = null;
+                        Debug.Log("Wrong node or node not having MapGenerator tag attached.");
+                    }
+
+                GUILayout.EndHorizontal();
+
 
             }
 
@@ -85,24 +112,13 @@ namespace UnityEditor.PMA1980.MapEditor
 
                 if (me._ref != lastRef && me._ref != null)
                 {
-                    showHelp = false;
                     lastRef = me._ref;
                 }
             }
-
-            showHelp = EditorGUILayout.Foldout(showHelp, "Help");
-            GuiLine(1);
-
-            if (showHelp)
-            {
-                _noref();
-                GuiLine();
-            }
-
-
+            _options();
             GUILayout.EndScrollView();
-
         }
+
 
         // Hierachy node referenced
 
@@ -123,46 +139,34 @@ namespace UnityEditor.PMA1980.MapEditor
 
             }
 
-
-            // MODIVIED PARAMETERS CAUSING REGENERATION
-            EditorGUI.BeginChangeCheck();
-
-            showTexture = EditorGUILayout.Foldout(showTexture, "Level Map"); GuiLine(1);
-
-            if (showTexture)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("LevelMap");
-                me.texture = (Texture2D)EditorGUILayout.ObjectField(me.texture, typeof(Texture2D), false);
-                GUILayout.EndHorizontal();
-
-                if (me.texture != null)
-                {
-                    Texture2D cover = me.texture;
-                    float imageWidth = Mathf.Clamp(EditorGUIUtility.currentViewWidth - 40, 10, 128);
-                    float imageHeight = Mathf.Clamp(imageWidth * cover.height / cover.width, 10, 128);
-
-                    Rect rect = GUILayoutUtility.GetRect(imageWidth, imageHeight);
-                    GUI.DrawTexture(rect, cover, ScaleMode.ScaleToFit);
-                }
-                GuiLine();
-
-            }
-
-            showScale = EditorGUILayout.Foldout(showScale, "Scale"); GuiLine(1);
+            showScale = EditorGUILayout.Foldout(showScale, "Alignment"); GuiLine(1);
 
             if (showScale)
             {
+
+                Vector2 maxsize = new(100, 100);
+                Vector2 maxoffset = new(0, 0);
+                if (texture != null)
+                {
+                    maxsize.x = texture.width; maxsize.y = texture.height;
+                    maxoffset.x = texture.width - maxsize.x; maxoffset.y = texture.height - maxsize.y;
+                }
                 GUILayout.BeginHorizontal();
-                GUILayout.Label("Width");
-                me.width = (int)EditorGUILayout.Slider(me.width, 1, 200);
+                GUILayout.Label("X"); me.pos_x = (int)EditorGUILayout.Slider(me.pos_x, 0, 512);
+                GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
+                GuiLine(1);
+
+                GUILayout.Label("Y"); me.pos_y = (int)EditorGUILayout.Slider(me.pos_y, 0, 512);
+                GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
+                GuiLine(1);
+
+                GUILayout.Label("W"); me.width = (int)EditorGUILayout.Slider(me.width, 1, maxsize.x);
+                GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
+                GuiLine(1);
+
+                GUILayout.Label("H"); me.height = (int)EditorGUILayout.Slider(me.height, 1, maxsize.y);
                 GUILayout.EndHorizontal();
-
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("Height");
-                me.height = (int)EditorGUILayout.Slider(me.height, 1, 200);
-                GUILayout.EndHorizontal(); GuiLine();
-
+                GuiLine();
             }
 
 
@@ -173,21 +177,9 @@ namespace UnityEditor.PMA1980.MapEditor
             }
         }
 
+
         // Hierachy node not referenced. Show Help.
 
-        private void _noref()
-        {
-            GUIStyle style = new GUIStyle(GUI.skin.textArea);
-            style.richText = true;
-
-            style.wordWrap = true;
-            style.margin = new RectOffset(10, 10, 10, 10);
-            EditorGUILayout.TextArea("Welcome to PMA1980´s Map Editor.\r\n\r\nThere is no <color=red>reference</color> selected. Create a Empty Gameobject in the hierachy and give it the <color=yellow>tag 'MapGenerator'</color>. Afterwards drag it to the Objectfield '_ref'" +
-                "\r\n\r\nAll generated Objects get a BoxCollider by default to make the Raycast work.\r\n\r\n" +
-                "All generated Objects get a 'Generated' tag. MapEditor only manipulates Objects with this tag to not mistakenly manipule Objects in scene not affecting MapEditor.", style);
-
-
-        }
 
         // Add a button to the Editor-window and switch the modifier mode (enum).
         // Attach the Raycast-Script if any mode is active
@@ -200,18 +192,25 @@ namespace UnityEditor.PMA1980.MapEditor
 
             rect.height = i_height * 1f;
 
-
-
             EditorGUI.DrawRect(rect, new Color(0.3f, 0.3f, 0.3f, 1));
 
             if (i_height == 2)
             {
-                rect.x -= 6;rect.height = 1;
+                rect.x -= 6; rect.height = 1;
                 EditorGUI.DrawRect(rect, new Color(0.2f, 0.2f, 0.2f, 1));
 
             }
 
         }
+
+        void GuiBox(Color c)
+
+        {
+            Rect rect = GUILayoutUtility.GetRect(16f, 16f);
+            rect.xMax = 16f;
+            EditorGUI.DrawRect(rect, c);
+        }
+
 
         private MG_MODE add_modifier_button(MG_MODE mod, MG_MODE mod_state, string text)
         {
@@ -231,13 +230,14 @@ namespace UnityEditor.PMA1980.MapEditor
                     SceneView.duringSceneGui += OnSceneGUI;
                     mod = mod_state;
                 }
-            }   
+            }
 
             GUI.color = new Color32(255, 255, 255, 255);
             return mod;
         }
 
 
+        // react to mouse raycasting from editorcamera
 
         public void OnSceneGUI(SceneView sceneView)
         {
@@ -313,7 +313,36 @@ namespace UnityEditor.PMA1980.MapEditor
                 }
             }
         }
+
+
+        public bool resizeInstance = true, UpdateGenerator = true;
+
+        void _options()
+        {
+            showOptions = EditorGUILayout.Foldout(showOptions, "Settings");
+            GuiLine(1);
+       
+            GUIStyle style = GUI.skin.toggle;
+            style.alignment = TextAnchor.MiddleRight;
+            if (showOptions)
+            {
+                EditorGUILayout.BeginHorizontal();
+
+                GUILayout.FlexibleSpace();
+                resizeInstance = EditorGUILayout.Toggle("Resize Library", resizeInstance, style);
+               
+
+                GUILayout.EndHorizontal(); GuiLine(); EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+
+                UpdateGenerator = EditorGUILayout.Toggle("Update Generator", resizeInstance, style);
+                GUILayout.EndHorizontal();
+                GuiLine();
+
+            }
+        }
     }
-
-
 }
+
+
+

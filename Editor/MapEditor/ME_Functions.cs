@@ -1,6 +1,14 @@
+using NUnit.Framework;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using TMPro.SpriteAssetUtilities;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.UI;
+using static Codice.CM.Common.Serialization.PacketFileReader;
 
 namespace UnityEditor.PMA1980.MapEditor
 {
@@ -66,12 +74,6 @@ namespace UnityEditor.PMA1980.MapEditor
                 Fill_map(me);
             else
             {
-                if (lastTex != me.texture)
-                {
-                    me.pixels = me.texture.GetPixels(0);
-                    lastTex = me.texture;
-                }
-
 
 
                 float x_scale = 1f / me.width;
@@ -82,16 +84,125 @@ namespace UnityEditor.PMA1980.MapEditor
                 for (int y = 0; y < me.height; y++)
                 {
                     for (int x = 0; x < me.width; x++)
+                    {
 
-                        if (x < me.texture.width && y < me.texture.height)
-                            if (me.pixels[x + image_width * y].r > 0)
-                                spawn_block(me, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
+                        int multidim_to_chain = (x + me.pos_x) + (image_width * (y + me.pos_y));
+                        Color seek_color = me.tex_pixels[multidim_to_chain];
+                        var go_to_spawn = me.instance_slot[seek_color];
 
+                        if (go_to_spawn != null)
+                            spawn_block(go_to_spawn, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
+
+                        else
+                                if (me._instance.transform.childCount > 0)
+                            spawn_block(me._instance.transform.GetChild(1).gameObject, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
+                    }
                 }
             }
         }
 
+        public static void refresh_palette(ME_Globals me)
+        {
+            if (me._instance == null)
 
+                return;
+
+            try
+            {
+                me.tex_pixels = me.texture.GetPixels();
+            }
+            catch (Exception e)
+            {
+                Debug.Log("Texture not readable! Change texture import settings to read/write and pointfilter. " + e);
+                return;
+            }
+            me.pixels = fetch_palette(me.texture);
+
+            if (me._instance.transform.childCount < me.pixels.Count())
+            {
+                Debug.Log("MapEditor: We have " + me.pixels.Count() + " colors and " + me._instance.transform.childCount
+            + " possible Instances to spawn. Please add/remove Instances from library-node.");
+                return;
+            }
+            me.instance_slot.Clear();
+
+            for (int i = 0; i < me.pixels.Length; i++)
+            {
+                me.instance_slot.Add(me.pixels[i], me._instance.transform.GetChild(i).gameObject);
+            }
+
+
+        }
+
+
+
+
+        public static Color[] fetch_palette(Texture2D tex)
+        {
+            Texture2D palette_tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+
+            var contentPath = Application.dataPath + "/../Assets/Ressources/LevelPalettes/";
+
+            if (!Directory.Exists(contentPath))
+                Directory.CreateDirectory(contentPath);
+
+            var dirPath = Application.dataPath + "/../Assets/Ressources/LevelPalettes/"
+                + tex.name + "_palette" + ".png";
+
+            byte[] fileData;
+
+            if (File.Exists(dirPath))
+            {
+                fileData = File.ReadAllBytes(dirPath);
+                palette_tex.LoadImage(fileData);
+            }
+            else
+            {
+                // new file
+                Color[] cols = tex.GetPixels();
+                List<Color> palette = new List<Color>();
+
+                foreach (Color col in cols)
+                    if (!palette.Contains(col))
+                        palette.Add(col);
+
+                palette_tex.filterMode = FilterMode.Point;
+                palette_tex.name = tex.name;
+                palette_tex.alphaIsTransparency = true;
+                palette_tex.Reinitialize(palette.Count, 1);
+
+                Color[] palette_cols = palette.ToArray();
+                // Array.Resize(ref palette_cols, 1024);
+
+                palette_tex.SetPixels(palette_cols);
+                palette_tex.Apply();
+
+                save_palette(palette_tex);
+            }
+
+            Color[] _cols = palette_tex.GetPixels();
+
+            int countColors = 0;
+            foreach (Color col in _cols)
+            {
+                if (col.a == 0)
+                    break;
+                countColors++;
+
+            }
+            return _cols;
+        }
+
+        public static void save_palette(Texture2D tex)
+        {
+            byte[] bytes = tex.EncodeToPNG();
+            var dirPath = Application.dataPath + "/../Assets/Ressources/LevelPalettes/";
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
+            File.WriteAllBytes(dirPath + tex.name + "_palette" + ".png", bytes);
+        }
 
 
         public static void Fill_map(ME_Globals me)
@@ -109,22 +220,22 @@ namespace UnityEditor.PMA1980.MapEditor
                     for (int x = 0; x < me.width; x++)
                     {
 
-                        spawn_block(me, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
+                        spawn_block(me._instance, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
                     }
                 }
             }
         }
 
-        static void spawn_block(ME_Globals me, Transform transform, Vector2 position, Vector2 scale)
+        public static GameObject spawn_block(GameObject go, Transform transform, Vector2 position, Vector2 scale, bool originalName = false)
         {
             float x = position.x; float y = position.y;
             float x_scale = scale.x; float y_scale = scale.y;
 
-            if (me._instance != null)
+            if (go != null)
             {
 
 
-                var block = Instantiate(me._instance);
+                var block = Instantiate(go);
 
                 if (block.GetComponent<BoxCollider>() == null)
                     block.AddComponent<BoxCollider>();
@@ -136,11 +247,16 @@ namespace UnityEditor.PMA1980.MapEditor
                 block.transform.parent = transform;
                 block.transform.localPosition = new((x + 0.5f) * x_scale - 0.5f, 0f, (y + 0.5f) * y_scale - 0.5f);
 
-                block.name = "B" + min_scale.ToString();
+                if (!originalName)
+                    block.name = "B" + min_scale.ToString();
+
+                return block;
+
             }
             else
             {
                 Debug.Log("MapEditor: No Instance specified!");
+                return null;
             }
         }
 
@@ -151,5 +267,14 @@ namespace UnityEditor.PMA1980.MapEditor
                 DestroyImmediate(transform.GetChild(0).gameObject);
             }
         }
+
+        public static void cleanup_library(ME_Globals me, int num_of_go) 
+        {
+            while (me._instance.transform.childCount > num_of_go)
+            {
+                DestroyImmediate(me._instance.transform.GetChild(me._instance.transform.childCount - 1).gameObject);
+            }
+        }
+
     }
 }
