@@ -13,8 +13,8 @@ namespace UnityEditor.PMA1980.MapEditor
         public int width = 1, height = 1,pos_x, pos_y;
         public MG_MODE modifier_mode = MG_MODE.NOTHING;
         public Texture2D texture = null;
-        public Color[] pixels, tex_pixels;
-        public Dictionary<Color, GameObject> instance_slot;
+        public Color32[] pixels, tex_pixels;
+        public Dictionary<Color32, GameObject> instance_slot;
         public ME_Globals()
         {
             width = 1; height = 1; pos_x = 0; pos_y = 0;
@@ -23,7 +23,7 @@ namespace UnityEditor.PMA1980.MapEditor
             pixels = null;
 
             tex_pixels = null;
-            instance_slot = new Dictionary<Color, GameObject>();
+            instance_slot = new Dictionary<Color32, GameObject>();
 
         }
     }

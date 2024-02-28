@@ -1,14 +1,19 @@
-using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using TMPro;
 using TMPro.SpriteAssetUtilities;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
+using UnityEngine.Windows;
 using static Codice.CM.Common.Serialization.PacketFileReader;
+using static log4net.Appender.ColoredConsoleAppender;
+using static System.Net.Mime.MediaTypeNames;
+using Application = UnityEngine.Application;
+using Directory = UnityEngine.Windows.Directory;
+using File = UnityEngine.Windows.File;
 
 namespace UnityEditor.PMA1980.MapEditor
 {
@@ -86,11 +91,17 @@ namespace UnityEditor.PMA1980.MapEditor
                     for (int x = 0; x < me.width; x++)
                     {
 
-                        int multidim_to_chain = (x + me.pos_x) + (image_width * (y + me.pos_y));
-                        Color seek_color = me.tex_pixels[multidim_to_chain];
+                        int multidim_to_chain = (x + me.pos_x) + (me.texture.width * (y + me.pos_y));
+                        Color32 seek_color = me.tex_pixels[multidim_to_chain];
+
+                        /*     seek_color = new Color((float)Math.Round(seek_color.r, 2),
+                                 (float)Math.Round(seek_color.g, 2),
+                                 (float)Math.Round(seek_color.b, 2),
+                                 (float)Math.Round(seek_color.a, 2)); */
+
                         var go_to_spawn = me.instance_slot[seek_color];
 
-                        if (go_to_spawn != null)
+                        if (go_to_spawn != null)    
                             spawn_block(go_to_spawn, transform, new Vector2(x, y), new Vector2(x_scale, y_scale));
 
                         else
@@ -101,22 +112,37 @@ namespace UnityEditor.PMA1980.MapEditor
             }
         }
 
+
+
+
         public static void refresh_palette(ME_Globals me)
         {
-            if (me._instance == null)
-
-                return;
-
             try
             {
-                me.tex_pixels = me.texture.GetPixels();
+                me.tex_pixels = me.texture.GetPixels32();
             }
-            catch (Exception e)
+            catch (System.Exception e)
             {
                 Debug.Log("Texture not readable! Change texture import settings to read/write and pointfilter. " + e);
                 return;
             }
-            me.pixels = fetch_palette(me.texture);
+
+            if (me._instance == null)
+                return;
+
+            string texture_path = AssetDatabase.GetAssetPath(me.texture);
+
+            ME_Helper.decimate_colors(texture_path, 16);
+
+            string palettepath = texture_path.Substring(0, texture_path.LastIndexOf("_dec")) + "_pal16.png";
+            Texture2D palette = new(2, 2, me.texture.format, false, true, false);
+            var rawData = System.IO.File.ReadAllBytes(palettepath);
+            palette.LoadImage(rawData);
+            palette.filterMode = FilterMode.Point;
+            palette.alphaIsTransparency = true;
+            palette.anisoLevel = 0;
+            palette.Apply();
+            me.pixels = palette.GetPixels32();
 
             if (me._instance.transform.childCount < me.pixels.Count())
             {
@@ -130,67 +156,11 @@ namespace UnityEditor.PMA1980.MapEditor
             {
                 me.instance_slot.Add(me.pixels[i], me._instance.transform.GetChild(i).gameObject);
             }
-
-
         }
 
-
-
-
-        public static Color[] fetch_palette(Texture2D tex)
+        public static bool IsEqualTo(Color me, Color other)
         {
-            Texture2D palette_tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-
-            var contentPath = Application.dataPath + "/../Assets/Ressources/LevelPalettes/";
-
-            if (!Directory.Exists(contentPath))
-                Directory.CreateDirectory(contentPath);
-
-            var dirPath = Application.dataPath + "/../Assets/Ressources/LevelPalettes/"
-                + tex.name + "_palette" + ".png";
-
-            byte[] fileData;
-
-            if (File.Exists(dirPath))
-            {
-                fileData = File.ReadAllBytes(dirPath);
-                palette_tex.LoadImage(fileData);
-            }
-            else
-            {
-                // new file
-                Color[] cols = tex.GetPixels();
-                List<Color> palette = new List<Color>();
-
-                foreach (Color col in cols)
-                    if (!palette.Contains(col))
-                        palette.Add(col);
-
-                palette_tex.filterMode = FilterMode.Point;
-                palette_tex.name = tex.name;
-                palette_tex.alphaIsTransparency = true;
-                palette_tex.Reinitialize(palette.Count, 1);
-
-                Color[] palette_cols = palette.ToArray();
-                // Array.Resize(ref palette_cols, 1024);
-
-                palette_tex.SetPixels(palette_cols);
-                palette_tex.Apply();
-
-                save_palette(palette_tex);
-            }
-
-            Color[] _cols = palette_tex.GetPixels();
-
-            int countColors = 0;
-            foreach (Color col in _cols)
-            {
-                if (col.a == 0)
-                    break;
-                countColors++;
-
-            }
-            return _cols;
+            return me.r == other.r && me.g == other.g && me.b == other.b;
         }
 
         public static void save_palette(Texture2D tex)
@@ -268,7 +238,7 @@ namespace UnityEditor.PMA1980.MapEditor
             }
         }
 
-        public static void cleanup_library(ME_Globals me, int num_of_go) 
+        public static void cleanup_library(ME_Globals me, int num_of_go)
         {
             while (me._instance.transform.childCount > num_of_go)
             {
@@ -276,5 +246,24 @@ namespace UnityEditor.PMA1980.MapEditor
             }
         }
 
+        public static void OnPostprocessTexture(Texture2D texture)
+        {
+            TextureImporter importer = new TextureImporter();
+            importer.alphaIsTransparency = true;
+            importer.filterMode = FilterMode.Point;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+
+            UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath(importer.assetPath, typeof(Texture2D));
+            if (asset)
+            {
+                EditorUtility.SetDirty(asset);
+            }
+            else
+            {
+                texture.anisoLevel = 0;
+                texture.filterMode = FilterMode.Point;
+            }
+        }
     }
 }

@@ -36,6 +36,15 @@ namespace UnityEditor.PMA1980.MapEditor
             {
                 EditorGUI.BeginChangeCheck();
                 me.texture = (Texture2D)EditorGUILayout.ObjectField(me.texture, typeof(Texture2D), false);
+                
+                if (me.texture != null )
+                {
+                    me.texture.filterMode = FilterMode.Point;
+                    me.texture.alphaIsTransparency = true;
+                    me.texture.anisoLevel = 0;
+                    me.texture.Apply();
+
+                }
 
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -105,7 +114,7 @@ namespace UnityEditor.PMA1980.MapEditor
 
                     GuiBox(me.pixels[count]);
 
-                    EditorGUILayout.LabelField(count.ToString().PadLeft(3,'0'), style);
+                    EditorGUILayout.LabelField(count.ToString().PadLeft(3, '0'), style);
                     EditorGUI.BeginChangeCheck();
 
                     if (count < num_of_go)
@@ -122,7 +131,7 @@ namespace UnityEditor.PMA1980.MapEditor
                     {
                         GameObject go = spawn_block(me.instance_slot[me.pixels[count]], me._instance.transform, Vector2.zero, Vector2.one, true);
 
-                        if (me._instance.transform.childCount > count)
+                        if (me._instance.transform.childCount > count )
                         {
                             DestroyImmediate(me._instance.transform.GetChild(count).gameObject);
                             go.transform.SetSiblingIndex(count);
@@ -132,16 +141,16 @@ namespace UnityEditor.PMA1980.MapEditor
                     }
                     GUILayout.EndHorizontal();
                     count++;
-
-                    if (cleanup)
-                    {
-                        if (resizeInstance)
+                }
+                if (cleanup)
+                {
+                    if (resizeInstance)
                         cleanup_library(me, me.pixels.Count());
 
-                        if (UpdateGenerator)
-                            Generate_map(me);
+                    if (UpdateGenerator)
+                        Generate_map(me);
 
-                    }
+
 
                     GuiLine();
                 }

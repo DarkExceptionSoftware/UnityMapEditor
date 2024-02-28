@@ -154,15 +154,12 @@ namespace UnityEditor.PMA1980.MapEditor
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("X"); me.pos_x = (int)EditorGUILayout.Slider(me.pos_x, 0, 512);
                 GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
-                GuiLine(1);
 
                 GUILayout.Label("Y"); me.pos_y = (int)EditorGUILayout.Slider(me.pos_y, 0, 512);
                 GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
-                GuiLine(1);
 
                 GUILayout.Label("W"); me.width = (int)EditorGUILayout.Slider(me.width, 1, maxsize.x);
                 GUILayout.EndHorizontal(); GuiLine(); GUILayout.BeginHorizontal();
-                GuiLine(1);
 
                 GUILayout.Label("H"); me.height = (int)EditorGUILayout.Slider(me.height, 1, maxsize.y);
                 GUILayout.EndHorizontal();
