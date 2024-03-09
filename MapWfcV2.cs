@@ -1,14 +1,9 @@
 
-using JetBrains.Annotations;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
-using System.Globalization;
-using System.Linq;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UIElements;
 using Random = UnityEngine.Random;
 
@@ -17,20 +12,16 @@ namespace PMA1980.MapGenerator
 
     public class MapWfcV2 : MonoBehaviour
     {
-        public GameObject library;
         public Vector2Int size, pos;
-        public Texture2D map;
-        public Color[] map_pixels;
-        public Dictionary<Color32, GameObject> instance_slots = new Dictionary<Color32, GameObject>();
         public GameObject[] prefab_objects;
-        public Color32[] pixels;
-
+        [Range(0, 100)] public int[] Weights;
         private Vector3 move_pos, start_transform_pos;
         private float elapsed, elapsed_movement;
         private Vector3 lastPosition = Vector3.zero;
 
         public Tile_data[,] wfc_map;
         public List<Tile_data> worker_list = new List<Tile_data>();
+        public List<Tile_data> worker_list_retry = new List<Tile_data>();
 
         public Vector2Int actual_position;
 
@@ -51,7 +42,6 @@ namespace PMA1980.MapGenerator
             new TileInfo(
             "Stone",
             TILEID.FLOOR,
-
             new TILEID[]
             {TILEID.FLOOR,TILEID.FLOOR, TILEID.FLOOR,TILEID.FLOOR},
             1, DIRECTION.NORTH) ,
@@ -68,119 +58,119 @@ namespace PMA1980.MapGenerator
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.FLOOR, TILEID.FLOOR,TILEID.FLOOR},
-            3, DIRECTION.WEST) ,
+            3, DIRECTION.WEST, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_east",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.WALL, TILEID.FLOOR,TILEID.FLOOR },
-            3, DIRECTION.NORTH) ,
+            3, DIRECTION.NORTH, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_south",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.FLOOR, TILEID.WALL,TILEID.FLOOR },
-            3, DIRECTION.EAST) ,
+            3, DIRECTION.EAST, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.FLOOR, TILEID.FLOOR,TILEID.WALL },
-            3, DIRECTION.SOUTH) ,
+            3, DIRECTION.SOUTH, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_north_east",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL, TILEID.WALL ,TILEID.FLOOR,TILEID.FLOOR},
-            4, DIRECTION.EAST) ,
+            4, DIRECTION.EAST, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_north_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.FLOOR,TILEID.FLOOR, TILEID.WALL },
-            4, DIRECTION.NORTH) ,
+            4, DIRECTION.NORTH, SPAM.ON_FITTING_SIDE) ,
 
             new TileInfo(
             "wall_south_east",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.WALL, TILEID.WALL,TILEID.FLOOR },
-            4, DIRECTION.SOUTH),
+            4, DIRECTION.SOUTH, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_south_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.FLOOR, TILEID.WALL,TILEID.WALL },
-            4, DIRECTION.WEST),
+            4, DIRECTION.WEST, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_north_south",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.FLOOR, TILEID.WALL,TILEID.FLOOR },
-            5, DIRECTION.NORTH),
+            5, DIRECTION.NORTH, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_east_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.WALL, TILEID.FLOOR,TILEID.WALL },
-            5, DIRECTION.EAST),
+            5, DIRECTION.EAST, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_north_east_south",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.WALL, TILEID.WALL,TILEID.FLOOR },
-            6, DIRECTION.SOUTH),
+            6, DIRECTION.SOUTH, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_east_south_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.WALL, TILEID.WALL,TILEID.WALL },
-            6, DIRECTION.WEST),
+            6, DIRECTION.WEST, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_south_west_north",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.FLOOR, TILEID.WALL,TILEID.WALL },
-            6, DIRECTION.NORTH),
+            6, DIRECTION.NORTH, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_west_north_east",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.WALL, TILEID.FLOOR,TILEID.WALL },
-            6, DIRECTION.EAST),
+            6, DIRECTION.EAST, SPAM.ON_FITTING_SIDE),
 
             new TileInfo(
             "wall_full_cross",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.WALL, TILEID.WALL,TILEID.WALL },
-            7, DIRECTION.NORTH),
+            7, DIRECTION.NORTH, SPAM.ON_NO_SIDE),
 
             new TileInfo(
             "gate_east_west",
             TILEID.WALL,
             new TILEID[]
             {TILEID.FLOOR,TILEID.WALL, TILEID.FLOOR,TILEID.WALL },
-            8, DIRECTION.EAST),
+            8, DIRECTION.EAST, SPAM.ON_NO_SIDE),
 
             new TileInfo(
             "gate_north_south",
             TILEID.WALL,
             new TILEID[]
             {TILEID.WALL,TILEID.FLOOR, TILEID.WALL,TILEID.FLOOR },
-            8, DIRECTION.NORTH),
+            8, DIRECTION.NORTH, SPAM.ON_NO_SIDE),
         };
 
         #endregion
@@ -192,7 +182,23 @@ namespace PMA1980.MapGenerator
                 this.position = _position;
             }
 
-            public Vector2Int position = new(0, 0);
+            private Vector2Int _position;
+
+
+            public Vector2Int position   // property
+            {
+                get { return _position; }   // get method
+                set
+                {
+                    _position =
+                        new Vector2Int(Math.Clamp(value.x, 0, 16),
+                        Math.Clamp(value.y, 0, 16));
+                }
+            }
+
+
+
+            public GameObject go = null;
             public bool collapsed = false;
             public TileInfo tileData = new TileInfo();
             public int tileIndex;
@@ -208,10 +214,26 @@ namespace PMA1980.MapGenerator
 
             string test = TileLibrary[1].name;
             reset_map();
+
+
+            using (var writer = new StreamWriter(Application.dataPath +  "path\\to\\file.csv"))
+            using (CsvWriter csv = new(writer, CultureInfo.InvariantCulture))
+            {
+                csv.WriteRecords(TileLibrary);
+            }
         }
 
         public void reset_map()
         {
+            for (int i = 0; i < TileLibrary.Count(); i++)
+            {
+                if (Weights.Count() > i)
+                {
+                    TileLibrary[i].spawnChance = Weights[i];
+                }
+            }
+
+
             wfc_map = new Tile_data[size.x, size.y];
             worker_list.Clear();
 
@@ -245,7 +267,10 @@ namespace PMA1980.MapGenerator
 
             }
 
-            if (elapsed - elapsed_movement > 0.2)
+
+            // if (Input.GetKeyDown(KeyCode.Space))
+            if (true)
+            //     if (elapsed - elapsed_movement > 0.2)
             {
                 elapsed_movement = elapsed;
                 generate();
@@ -257,6 +282,8 @@ namespace PMA1980.MapGenerator
         // Update is called once per frame
         void generate()
         {
+            if (worker_list.Count == 0) return;
+
             float x_scale = 1f / size.x;
             float y_scale = 1f / size.y;
 
@@ -269,13 +296,27 @@ namespace PMA1980.MapGenerator
 
                     Tile_data inspect_worker = t;
                     Vector2Int ap = inspect_worker.position;
-                    var placement_rule = get_placement_rule(inspect_worker);
-                    inspect_worker = refresh_tile(inspect_worker, placement_rule);
+                    setup_posibilities(inspect_worker);
                 }
             }
 
 
-            var sorted_worker_list = worker_list.OrderByDescending(t => t.entropy).ThenBy(t => t.distance_from_center);
+
+            //     while (worker.Count > 0)
+            //    {
+            collapse_tiles();
+            foreach (Tile_data t in worker_list_retry)
+                recreate_tiles(t);
+
+            worker_list_retry.Clear();
+        }
+
+        public void collapse_tiles()
+        {
+            float x_scale = 1f / size.x;
+            float y_scale = 1f / size.y;
+
+            var sorted_worker_list = worker_list.OrderByDescending(t => t.entropy);//.ThenBy(t => t.distance_from_center);
             Stack<Tile_data> worker = new Stack<Tile_data>();
 
             foreach (Tile_data t in sorted_worker_list)
@@ -283,22 +324,46 @@ namespace PMA1980.MapGenerator
 
             while (worker.Count > 0)
             {
+
                 Tile_data inspect_worker = worker.Pop();
                 Vector2Int ap = inspect_worker.position;
+                // Debug.Log(inspect_worker.entropy);
 
                 if (inspect_worker.posibilities.Count > 0)
                 {
                     if (!inspect_worker.collapsed)
                     {
-                        TileInfo picked_tile = inspect_worker.posibilities[Random.Range(0, inspect_worker.posibilities.Count)];
+                        int totalChance = 0;
+                        foreach (var pb in inspect_worker.posibilities)
+                            totalChance += pb.spawnChance;
+
+                        int chance = Random.Range(0, totalChance + 1);
+                        int cumulative = 0;
+
+                        TileInfo picked_tile = new();
+
+                        foreach (var pb in inspect_worker.posibilities)
+                        {
+                            cumulative += pb.spawnChance;
+                            if (chance <= cumulative)
+                            {
+                                picked_tile = pb;
+                                break;
+                            }
+                        }
                         inspect_worker.tileData = picked_tile;
                     }
                 }
-                Spawn_block(getOption(inspect_worker.tileData),
-                        transform,
-                        new Vector2(ap.x * 2f,
-                        ap.y * 2f),
-                        new Vector2(x_scale, y_scale), inspect_worker.tileIndex + "_" + inspect_worker.tileData.name);
+
+                GameObject go = getOption(inspect_worker.tileData);
+
+
+                if (go != null)
+                    inspect_worker.go = Spawn_block(go,
+                            transform,
+                            new Vector2(ap.x * 2f,
+                            ap.y * 2f),
+                            new Vector2(x_scale, y_scale), inspect_worker.tileIndex + "_" + inspect_worker.tileData.name);
 
                 inspect_worker.collapsed = true;
                 hire_new_workers(inspect_worker);
@@ -313,10 +378,13 @@ namespace PMA1980.MapGenerator
 
         }
 
-        TILEID[] get_placement_rule(Tile_data ap)
+        void setup_posibilities(Tile_data ap)
         {
             TileInfo tileInfo = new TileInfo();
-            var tilecheck = tileInfo.tileid;
+
+            var allowed_sides = tileInfo.tileid;
+            var surrounding_tiles = new TILEID[4] { TILEID.VACUUM, TILEID.VACUUM, TILEID.VACUUM, TILEID.VACUUM };
+            var surrounding_names = new string[4];
 
             TileInfo cP = new TileInfo();
 
@@ -328,7 +396,9 @@ namespace PMA1980.MapGenerator
 
                     if (cP != null)
                     {
-                        tilecheck[2] = cP.tileid[0];
+                        allowed_sides[2] = cP.tileid[0];
+                        surrounding_tiles[2] = cP.tile;
+                        surrounding_names[2] = cP.name;
                     }
                 }
             }
@@ -341,8 +411,9 @@ namespace PMA1980.MapGenerator
                     if (cP != null)
                     {
 
-                        tilecheck[0] = cP.tileid[2];
-
+                        allowed_sides[0] = cP.tileid[2];
+                        surrounding_tiles[0] = cP.tile;
+                        surrounding_names[0] = cP.name;
                     }
                 }
             }
@@ -355,8 +426,9 @@ namespace PMA1980.MapGenerator
                     if (cP != null)
                     {
 
-                        tilecheck[3] = cP.tileid[1];
-
+                        allowed_sides[3] = cP.tileid[1];
+                        surrounding_tiles[3] = cP.tile;
+                        surrounding_names[3] = cP.name;
                     }
                 }
             }
@@ -369,45 +441,103 @@ namespace PMA1980.MapGenerator
                     if (cP != null)
                     {
 
-                        tilecheck[1] = cP.tileid[3];
-
+                        allowed_sides[1] = cP.tileid[3];
+                        surrounding_tiles[1] = cP.tile;
+                        surrounding_names[1] = cP.name;
                     }
                 }
             }
             Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
 
-            Debug.Log("RULE:" + ap.position.ToString() + " " + tilecheck[0] + "\r\n" +
-                tilecheck[3] + " - " + tilecheck[1] + "\r\n             " +
-                tilecheck[2]);
+            /*      Debug.Log("RULE:" + ap.position.ToString() + " " + allowed_sides[0] + "\r\n" +
+                      allowed_sides[3] + " - " + allowed_sides[1] + "\r\n             " +
+                      allowed_sides[2]);
+            */
 
-
-            return tilecheck;
-        }
-
-        public Tile_data refresh_tile(Tile_data tileData, TILEID[] rule)
-        {
-            tileData.distance_from_center = Math.Abs(
-                (tileData.position.x * tileData.position.y) -
+            ap.distance_from_center = Math.Abs(
+                (ap.position.x * ap.position.y) -
                 (int)Mathf.Pow(size.x / 2, 2));
 
-            tileData.posibilities = new List<TileInfo>();
+            ap.posibilities = new List<TileInfo>();
 
             int index = 0;
             foreach (TileInfo tl in TileLibrary)
             {
+                bool add_candidate = false;
                 TILEID[] t = tl.tileid;
+                TILEID ti = tl.tile;
+                // check sides
 
-                if (t[0] == rule[0] || rule[0] == TILEID.VACUUM)
-                    if (t[1] == rule[1] || rule[1] == TILEID.VACUUM)
-                        if (t[2] == rule[2] || rule[2] == TILEID.VACUUM)
-                            if (t[3] == rule[3] || rule[3] == TILEID.VACUUM)
-                                tileData.posibilities.Add(tl);
+                if (t[0] == allowed_sides[0] || allowed_sides[0] == TILEID.VACUUM)
+                    if (t[1] == allowed_sides[1] || allowed_sides[1] == TILEID.VACUUM)
+                        if (t[2] == allowed_sides[2] || allowed_sides[2] == TILEID.VACUUM)
+                            if (t[3] == allowed_sides[3] || allowed_sides[3] == TILEID.VACUUM)
+                                add_candidate = true;
+
+                if (tl.spam == SPAM.ON_FITTING_SIDE || tl.spam == SPAM.ON_NO_SIDE)
+                    for (int i = 0; i < 4; i++)
+                        if (ti != t[i] && ti == surrounding_tiles[i])
+                        {
+                            add_candidate = false;
+                        }
+
+                if (tl.spam == SPAM.ON_NO_SIDE)
+                    for (int i = 0; i < 4; i++)
+                        if (tl.name.Equals(surrounding_names[i]))
+                        {
+                            add_candidate = false;
+                        }
+
+
+
+
+                if (add_candidate)
+                {
+                    ap.posibilities.Add(tl);
+
+                }
+
+
                 index++;
             }
-            tileData.entropy = tileData.posibilities.Count;
+            ap.entropy = ap.posibilities.Count;
 
-            return tileData;
+            if (ap.posibilities.Count == 0)
+            {
+                worker_list_retry.Add(ap);
+
+            }
         }
+
+        void recreate_tiles(Tile_data ap)
+        {
+
+            Debug.Log("RECREATING: " + ap.position.ToString());
+            clear_wfc_position(ap.position.x - 1, ap.position.y);
+            clear_wfc_position(ap.position.x + 1, ap.position.y);
+            clear_wfc_position(ap.position.x, ap.position.y - 1);
+            clear_wfc_position(ap.position.x, ap.position.y + 1);
+            clear_wfc_position(ap.position.x, ap.position.y);
+
+
+        }
+
+        void clear_wfc_position(int x, int y)
+        {
+            if (x < 0) return;
+            if (y < 0) return;
+            if (x >= size.x) return;
+            if (y >= size.y) return;
+
+            if (wfc_map[x, y].go != null)
+                if (!wfc_map[x, y].go.IsDestroyed())
+                    Destroy(wfc_map[x, y].go);
+
+            wfc_map[x, y] = null;
+            create_worker(new Vector2Int(x, y));
+
+        }
+
 
         void hire_new_workers(Tile_data ap)
         {
@@ -430,9 +560,14 @@ namespace PMA1980.MapGenerator
 
         public GameObject getOption(TileInfo option)
         {
-            GameObject go = prefab_objects[option.instance];
-            go.transform.eulerAngles = new(0, (int)option.direction, 0);
-            return go;
+            if (option.instance != -1)
+            {
+
+                GameObject go = prefab_objects[option.instance];
+                go.transform.eulerAngles = new(0, (int)option.direction, 0);
+                return go;
+            }
+            else return null;
         }
 
         public GameObject Spawn_block(GameObject go, Transform transform, Vector2 position, Vector2 scale, string _name, bool originalName = false)
